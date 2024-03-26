@@ -120,8 +120,6 @@ export default class Deposits {
 		return {
 			srcChainId,
 			dstChainId,
-			gasLimit: gasLimit.toString(),
-			gasPrice: gasPrice.toString(),
 			amount: amount.toString(),
 			depositFee: depositFee.toString(),
 			estimateFinalizeTxFee: estimateFinalizeTxFee.toString(),
