@@ -1,5 +1,6 @@
 FROM node:20.9.0
 
+ENV NODE_ENV='production'
 ENV WORKDIR='/app'
 ENV DB_NAME="deliver"
 ENV DB_USER="postgres"

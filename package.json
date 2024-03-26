@@ -6,7 +6,7 @@
 	"scripts": {
 		"build": "npx tsc --project . --module nodenext --moduleResolution nodenext --target esnext --outDir ./dist",
 		"clean": "rm -rf dist/",
-		"start": "npx cross-env NODE_ENV=production && node dist/main.js",
+		"start": "node dist/main.js",
 		"dev": "npx cross-env NODE_ENV=dev && yarn build && node dist/main.js"
 	},
 	"author": "",
