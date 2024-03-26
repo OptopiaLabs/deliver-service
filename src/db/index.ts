@@ -13,7 +13,11 @@ export const sequelize = new Sequelize(
 		dialect: 'postgres',
 		models: [DepositTxs, Withdrawals, FinalizeTxs, IndexedBlocks],
 		sync: { alter: true },
-		logging: false,
+		logging: (sql: string) => {
+			if (process.env.NODE_ENV === 'dev') {
+				console.log(sql)
+			}
+		},
 		port: Number(process.env.DB_PORT) || 5432
 	}
 )

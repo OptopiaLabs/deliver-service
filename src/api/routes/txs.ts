@@ -5,9 +5,9 @@ const router = new KoaRouter()
 
 router.get('/txs/:account', async (ctx) => {
 	const { account } = ctx.params
-	const { page, pageSize } = ctx.request.query
+	let { page, pageSize } = ctx.request.query
 	// TODO validate params
-	const txs = await Tx.get(account.toLocaleLowerCase(), Number(page), Number(pageSize))
+	const txs = await Tx.get(account.toLocaleLowerCase(), Number(page || 0), Number(pageSize || 10))
 	ctx.body = txs
 })
 

@@ -41,8 +41,12 @@ export async function initialize(chainId: string) {
 				if (receipt.status == 1) {
 					while (true) {
 						try {
-							const poolBalance = await dstContext.provider.getBalance(context.deliver.target)
-							if (poolBalance < BigInt(tx.amount)) {
+							const poolBalance = await dstContext.provider.getBalance(dstContext.deliver.target)
+							console.log('poolBalance', poolBalance, dstContext.deliver.target, typeof poolBalance)
+							console.log('tx.amount', BigInt(tx.amount), typeof BigInt(tx.amount))
+							console.log('tx.amount', BigInt(tx.amount), typeof BigInt(tx.amount))
+
+							if (poolBalance <= BigInt(tx.amount)) {
 								await DepositTxs.update({ status: 'insufficient-funds' }, { where: { logHash: tx.logHash } })
 								break
 							}
