@@ -4,7 +4,7 @@
 	"description": "",
 	"main": "index.js",
 	"scripts": {
-		"build": "tsc --project ./tsconfig.json --module nodenext --moduleResolution nodenext --target esnext",
+		"build": "npx tsc --project . --module nodenext --moduleResolution nodenext --target esnext",
 		"clean": "rm -rf dist/",
 		"start": "npx cross-env NODE_ENV=production && node dist/main.js",
 		"dev": "npx cross-env NODE_ENV=dev && yarn build && node dist/main.js"

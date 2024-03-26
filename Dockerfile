@@ -10,7 +10,8 @@ WORKDIR $WORKDIR
 COPY ./src ${WORKDIR}/src
 ADD ./package.json ./package-lock.json ./tsconfig.json ${WORKDIR}
 
-RUN npm i 
+RUN npm i
+
 RUN npm run build
 
 CMD npm run start
