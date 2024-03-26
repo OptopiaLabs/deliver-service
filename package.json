@@ -6,8 +6,8 @@
 	"scripts": {
 		"build": "tsc --project ./tsconfig.json --module nodenext --moduleResolution nodenext --target esnext",
 		"clean": "rm -rf dist/",
-		"start": "cross-env NODE_ENV=production && node dist/main.js",
-		"dev": "cross-env NODE_ENV=dev && yarn build && node dist/main.js"
+		"start": "npx cross-env NODE_ENV=production && node dist/main.js",
+		"dev": "npx cross-env NODE_ENV=dev && yarn build && node dist/main.js"
 	},
 	"author": "",
 	"license": "ISC",
