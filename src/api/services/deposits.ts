@@ -107,7 +107,7 @@ export default class Deposits {
 		const gas = await dstContext.deliver.finalize.estimateGas(txBody)
 		const feeData = await dstContext.provider.getFeeData()
 		const gasLimit = gas * BigInt(dstContext.finalizeTxGasLimitCap) / 100n
-		const gasPrice = feeData.gasPrice * BigInt(dstContext.finalizeTxGasPriceCap) / 100n
+		const gasPrice = feeData.gasPrice! * BigInt(dstContext.finalizeTxGasPriceCap) / 100n
 		const estimateFinalizeTxFee = gasLimit * gasPrice
 		if (received - depositFee <= estimateFinalizeTxFee) {
 			throw Errors.BAD_REQUEST.with(`estimate finalized ${received - depositFee} is less than estimateFinalizeTxFee ${estimateFinalizeTxFee}`)
