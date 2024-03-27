@@ -1,7 +1,7 @@
-import KoaRouter = require('@koa/router')
+import Router = require('@koa/router')
 import Deposits from '../services/deposits'
 
-const router = new KoaRouter()
+const router = new Router()
 
 router.post('/deposits/withdrawal/apply', async (ctx) => {
 	const {
@@ -16,7 +16,6 @@ router.post('/deposits/withdrawal/apply', async (ctx) => {
 	const adminSig = await Deposits.apply(chainId, logHash, from, to, amount, depositorSig)
 	ctx.body = adminSig
 })
-
 
 router.post('/deposits/estimate', async (ctx) => {
 	const {

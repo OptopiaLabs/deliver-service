@@ -4,9 +4,11 @@ import { join } from 'path'
 
 const routerFiles = globSync([join(__dirname, 'routes/**.ts'), join(__dirname, 'routes/**.js')], { ignore: [join(__dirname, 'routes/index.ts'), join(__dirname, 'routes/index.js')] })
 
-export const routers: Router[] = []
+const routers: Router[] = []
 
 for (const file of routerFiles) {
 	const router = require(file)
 	routers.push(router)
 }
+
+export default routers

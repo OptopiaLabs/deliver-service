@@ -1,7 +1,7 @@
-import KoaRouter = require('@koa/router')
+import Router = require('@koa/router')
 import Tx from '../services/txs'
 
-const router = new KoaRouter()
+const router = new Router()
 
 router.get('/txs/:account', async (ctx) => {
 	const { account } = ctx.params
