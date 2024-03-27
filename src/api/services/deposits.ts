@@ -91,7 +91,7 @@ export default class Deposits {
 			srcChainId,
 			logHash: ZeroHash, // never exists
 			to: ZeroAddress,
-			amount,
+			amount: received - depositFee,
 			timeoutAt: Math.floor(Date.now() / 1000) + 86400
 		}
 		const gas = await dstContext.deliver.finalize.estimateGas(txBody)
