@@ -1,5 +1,5 @@
 
-import { ETHDeliver, ETHDeliver__factory } from '@simpledeliver/contracts'
+import { ETHDeliver, ETHDeliver__factory } from '@simpledeliver/deliver-contracts'
 import { Block, JsonRpcProvider, Provider, Signer, Wallet } from 'ethers'
 import { join } from 'path'
 import { readFileSync, existsSync } from 'fs'
@@ -13,7 +13,7 @@ export let allChains: string[] = []
 
 type RelayerConfig = {
 	relayer: string
-	admin: string
+	guardian: string
 	rpc: string
 	deliver: string
 	startBlock: number
@@ -27,7 +27,7 @@ type RelayerConfig = {
 
 export interface Context {
 	signer: Signer // relayer
-	admin: Signer
+	guardian: Signer
 	provider: Provider
 	chainId: string
 	deliver: ETHDeliver
@@ -66,11 +66,13 @@ export async function initContext() {
 			assert(id.toString() == chainId, `inconsistent chain id ${chainId} ${id}`)
 			const relayerPhase = value.relayer
 			assert(!!relayerPhase, 'invalid relayer phase')
-			const adminPhase = value.admin
-			assert(!!adminPhase, 'invalid admin phase')
+			const guardianPhase = value.guardian
+			assert(!!guardianPhase, 'invalid guardian phase')
 			const signer = Wallet.fromPhrase(relayerPhase).connect(provider)
-			const admin = Wallet.fromPhrase(adminPhase).connect(provider)
+			const guardian = Wallet.fromPhrase(guardianPhase).connect(provider)
 			const deliver = ETHDeliver__factory.connect(value.deliver, signer)
+			const g = await deliver.guardian()
+			assert(g.toLocaleLowerCase() == guardian.address.toLocaleLowerCase(), 'guardian required to sign depositor withdrawal')
 			const config = await deliver.config()
 			const maxPCT = await deliver.MAXPCT();
 			const lastestBlock = await provider.getBlock('latest')
@@ -81,7 +83,7 @@ export async function initContext() {
 			const context: Context = {
 				deliver,
 				signer,
-				admin,
+				guardian,
 				provider,
 				chainId,
 				maxPCT,

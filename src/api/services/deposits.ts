@@ -11,8 +11,7 @@ export default class Deposits {
 	public static async apply(
 		chainId: string,
 		logHash: string,
-		from: string,
-		to: string,
+		depositor: string,
 		amount: string,
 		depositorSig: string
 	): Promise<AdminSig> {
@@ -27,11 +26,6 @@ export default class Deposits {
 		const exists = await context.deliver.depositorWithdrawals(logHash)
 		if (exists) {
 			throw Errors.BAD_REQUEST.with(`withdrawl already sent, wait to indexed`)
-		}
-		const owner = await context.deliver.owner()
-		const admin = await context.admin.getAddress()
-		if (owner.toLocaleLowerCase() !== admin.toLocaleLowerCase()) {
-			throw Errors.FORBIDDEN.with('admin required to sign')
 		}
 		const tx = await DepositTxs.findOne({ where: { logHash } })
 		if (!tx) {
@@ -56,11 +50,7 @@ export default class Deposits {
 					type: 'bytes32'
 				},
 				{
-					name: 'from',
-					type: 'address'
-				},
-				{
-					name: 'to',
+					name: 'depositor',
 					type: 'address'
 				},
 				{
@@ -69,13 +59,13 @@ export default class Deposits {
 				}
 			]
 		}
-		const payload = { logHash, from, to, amount }
+		const payload = { logHash, depositor, amount }
 		const hash = TypedDataEncoder.hash(domain, types, payload)
-		const depositor = recoverAddress(hash, depositorSig)
-		if (depositor.toLocaleLowerCase() !== from.toLocaleLowerCase() || from.toLocaleLowerCase() != tx.from.toLocaleLowerCase()) {
+		const from = recoverAddress(hash, depositorSig)
+		if (from.toLocaleLowerCase() !== depositor.toLocaleLowerCase() || from.toLocaleLowerCase() != tx.from.toLocaleLowerCase()) {
 			throw Errors.FORBIDDEN.with('signer is not the depositor')
 		}
-		const adminSig = await context.admin.signTypedData(domain, types, payload)
+		const adminSig = await context.guardian.signTypedData(domain, types, payload)
 		return adminSig
 	}
 

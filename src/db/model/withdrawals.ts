@@ -18,10 +18,7 @@ export class Withdrawals extends Model {
 	declare chainId: string
 
 	@Column({ type: DataType.STRING })
-	declare from: string
-
-	@Column({ type: DataType.STRING })
-	declare to: string
+	declare depositor: string
 
 	@Column({ type: DataType.STRING })
 	declare amount: string
@@ -30,7 +27,7 @@ export class Withdrawals extends Model {
 	declare depositorSig: string
 
 	@Column({ type: DataType.STRING })
-	declare adminSig: string
+	declare guarndianSig: string
 
 	@Column({ type: DataType.STRING })
 	declare status: 'indexed' | 'invalid' | 'finalized'

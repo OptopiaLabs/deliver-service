@@ -7,13 +7,12 @@ router.post('/deposits/withdrawal/apply', async (ctx) => {
 	const {
 		chainId,
 		logHash,
-		from,
-		to,
+		depositor,
 		amount,
 		depositorSig
 	} = ctx.request.body
 	// TODO validate params
-	const adminSig = await Deposits.apply(chainId, logHash, from, to, amount, depositorSig)
+	const adminSig = await Deposits.apply(chainId, logHash, depositor, amount, depositorSig)
 	ctx.body = adminSig
 })
 
