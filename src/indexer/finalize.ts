@@ -4,6 +4,7 @@ import { FinalizeTxs } from '../db/model/finalizeTxs'
 import { Op } from 'sequelize'
 import { sleep } from '../utils'
 import { DepositTxs } from '../db/model/depositTxs'
+import { sequelize } from '../db'
 
 export async function finalize(chainId: string) {
 	while (true) {
@@ -34,8 +35,14 @@ export async function finalize(chainId: string) {
 				}
 				if (recepit.status == 1) {
 					logger.info('tx finalized:', tx)
-					await DepositTxs.update({ status: 'finalized' }, { where: { logHash: tx.logHash } })
-					await FinalizeTxs.update({ status: 'finalized' }, { where: { logHash: tx.logHash } })
+					const transaction = await sequelize.transaction()
+					try {
+						await DepositTxs.update({ status: 'finalized' }, { where: { logHash: tx.logHash } })
+						await FinalizeTxs.update({ status: 'finalized' }, { where: { logHash: tx.logHash } })
+						transaction.commit()
+					} catch (e) {
+						transaction.rollback()
+					}
 				} else {
 					// unkown deposit
 					await FinalizeTxs.update({ status: 'unknown' }, { where: { logHash: tx.logHash } })
