@@ -4,10 +4,9 @@ import { DepositTxs } from '../db/model/depositTxs'
 import { FinalizeTxs } from '../db/model/finalizeTxs'
 import { Withdrawals } from '../db/model/withdrawals'
 import { IndexedBlocks } from '../db/model/indexedBlocks'
-
+import { sequelize } from '../db'
 import { sleep } from '../utils'
 import logger from '../utils/logger'
-import { sequelize } from 'src/db'
 
 export async function index(chainId: string) {
 	const indexed = await IndexedBlocks.findOne({ where: { chainId } })
