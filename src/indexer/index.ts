@@ -75,6 +75,8 @@ async function processDepositLog(context: Context, log: Log) {
 	const fee = BigInt(meta[5]).toString()
 	const timeoutAt = Number(meta[6])
 	const blockNumber = log.blockNumber
+	const block = await log.getBlock()
+	const blockTimestamp = block.timestamp
 	const logHash = solidityPackedKeccak256(['bytes32', 'uint256'], [txHash, logIndex])
 	const isSupported = !!getContext(srcChainId) && !!getContext(dstChainId)
 	const depositTx = {
@@ -89,6 +91,7 @@ async function processDepositLog(context: Context, log: Log) {
 		fee,
 		timeoutAt,
 		blockNumber,
+		blockTimestamp,
 		status: isSupported ? 'indexed' : 'unsupported-chain'
 	}
 	const exists = await DepositTxs.findOne({ where: { logHash } })
@@ -110,6 +113,8 @@ async function processFinalizeLog(context: Context, log: Log) {
 	const amount = BigInt(meta[5]).toString()
 	const fee = BigInt(meta[6]).toString()
 	const blockNumber = log.blockNumber
+	const block = await log.getBlock()
+	const blockTimestamp = block.timestamp
 	const finalizeTx = {
 		logHash,
 		relayer,
@@ -121,6 +126,7 @@ async function processFinalizeLog(context: Context, log: Log) {
 		amount,
 		fee,
 		blockNumber,
+		blockTimestamp,
 		status: 'indexed'
 	}
 	const exists = await FinalizeTxs.findOne({ where: { logHash } })

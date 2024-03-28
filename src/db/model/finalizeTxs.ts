@@ -34,4 +34,7 @@ export class FinalizeTxs extends Model {
 
 	@Column({ type: DataType.BIGINT })
 	declare blockNumber: number
+
+	@Column({ type: DataType.BIGINT })
+	declare blockTimestamp: number
 }

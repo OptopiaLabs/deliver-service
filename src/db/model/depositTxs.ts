@@ -39,5 +39,8 @@ export class DepositTxs extends Model {
 	declare status: 'indexed' | 'confirmed' | 'unknown' | 'invalid' | 'unsupported-chain' | 'insufficient-funds' | 'initialized' | 'finalized' | 'timeout' | 'withdrawn'
 
 	@Column({ type: DataType.BIGINT })
-	declare blockNumber: string
+	declare blockNumber: number
+
+	@Column({ type: DataType.BIGINT })
+	declare blockTimestamp: number
 }
