@@ -28,7 +28,7 @@ export async function initialize(chainId: string) {
 				}
 				const initialized = await dstContext.deliver.finalizedTxs(tx.logHash)
 				if (initialized) {
-					await DepositTxs.update({ status: 'initialized' }, { where: { logHash: tx.logHash } })
+					await DepositTxs.update({ status: 'finalized' }, { where: { logHash: tx.logHash } })
 					continue
 				}
 				const srcContext = getContext(tx.srcChainId)
