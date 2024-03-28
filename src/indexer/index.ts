@@ -7,6 +7,7 @@ import { IndexedBlocks } from '../db/model/indexedBlocks'
 
 import { sleep } from '../utils'
 import logger from '../utils/logger'
+import { sequelize } from 'src/db'
 
 export async function index(chainId: string) {
 	const indexed = await IndexedBlocks.findOne({ where: { chainId } })
@@ -24,9 +25,15 @@ export async function index(chainId: string) {
 			console.log('chainId:', chainId, 'index fromBlock:', fromBlock, 'toBlock:', toBlock)
 			if (toBlock > fromBlock) {
 				setContext(chainId, context)
-				await processEvents(context, fromBlock, toBlock)
-				await IndexedBlocks.upsert({ chainId: context.chainId, indexedBlock: toBlock })
-				fromBlock = toBlock
+				const transaction = await sequelize.transaction()
+				try {
+					await processEvents(context, fromBlock, toBlock)
+					await IndexedBlocks.upsert({ chainId: context.chainId, indexedBlock: toBlock })
+					fromBlock = toBlock
+					await transaction.commit()
+				} catch (e) {
+					await transaction.rollback()
+				}
 			}
 			if (toBlock - fromBlock != maxPollBlocks) {
 				await sleep(context.latestBlockPollTimeInterval)
