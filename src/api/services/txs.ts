@@ -35,6 +35,13 @@ export default class Txs {
 			},
 			{ type: QueryTypes.SELECT }
 		)
-		return txs
+		const total = await sequelize.query<{ total: number }>(
+			{
+				query: `select count(*) as total from "DepositTxs" dt left join "FinalizeTxs" ft on dt."logHash" = ft."logHash" left join "IndexedBlocks" ib0 on dt."srcChainId" = ib0."chainId" left join "IndexedBlocks" ib1 on ft."dstChainId" = ib1."chainId" where dt."from" = ? and dt."srcChainId" = ?`,
+				values: [account, chainId, pageSize, page * pageSize],
+			},
+			{ type: QueryTypes.SELECT }
+		)
+		return { txs, total: total[0].total }
 	}
 }
