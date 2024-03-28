@@ -57,6 +57,7 @@ export async function initialize(chainId: string) {
 							}
 							const initialized = await dstContext.deliver.finalizedTxs(tx.logHash)
 							if (initialized) {
+								// simple check currently
 								logger.info('tx already finalized:', tx)
 								await DepositTxs.update({ status: 'finalized' }, { where: { logHash: tx.logHash } })
 								break
