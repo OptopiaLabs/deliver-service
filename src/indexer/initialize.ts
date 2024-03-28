@@ -52,6 +52,20 @@ export async function initialize(chainId: string) {
 								break
 							}
 
+							const finalize = await FinalizeTxs.findOne({ where: { logHash: tx.logHash } })
+							if (finalize) {
+								if (finalize.status == 'finalized') {
+									await DepositTxs.update({ status: 'finalized' }, { where: { logHash: tx.logHash } })
+									break
+								}
+							}
+							const initialized = await dstContext.deliver.finalizedTxs(tx.logHash)
+							if (initialized) {
+								logger.info('tx already initialized:', tx)
+								await DepositTxs.update({ status: 'initialized' }, { where: { logHash: tx.logHash } })
+								break
+							}
+
 							const txBody = {
 								srcChainId: tx.srcChainId,
 								logHash: tx.logHash,
@@ -59,19 +73,7 @@ export async function initialize(chainId: string) {
 								amount: tx.amount,
 								timeoutAt: tx.timeoutAt
 							}
-							const initialized = await dstContext.deliver.finalizedTxs(tx.logHash)
-							if (initialized) {
-								logger.info('tx already initialized:', tx)
-								const finalize = await FinalizeTxs.findOne({ where: { logHash: tx.logHash } })
-								if (finalize) {
-									if (finalize.status == 'finalized') {
-										await DepositTxs.update({ status: 'finalized' }, { where: { logHash: tx.logHash } })
-									} else {
-										await DepositTxs.update({ status: 'initialized' }, { where: { logHash: tx.logHash } })
-									}
-									break
-								}
-							}
+
 							const gas = await dstContext.deliver.finalize.estimateGas(txBody)
 							const feeData = await dstContext.provider.getFeeData()
 							const t = await sequelize.transaction();
