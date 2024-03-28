@@ -28,13 +28,13 @@ interface Tx {
 export default class Txs {
 
 	public static async get(account: string, page: number, pageSize: number) {
-		const txs = await sequelize.query<[Tx[], unknown]>(
+		const txs = await sequelize.query<Tx>(
 			{
 				query: `select ib0."indexedBlock" as srcIndexedBlock, ib1."indexedBlock" as dstIndexedBlock, dt."logHash", dt."txHash" srcTxHash, dt."logIndex" srcLogIndex, dt."srcChainId", dt."dstChainId", dt."from", dt."to", dt.amount as depositAmount, dt.fee depositFee, dt."timeoutAt" , dt.status depositStatus, dt."blockNumber" depositBlockNumber, ft."txHash" finalizeTxHash, ft."logIndex" finalizeLogIndex, ft.relayer, ft.amount finalizeAmount, ft.fee finalizeFee, ft.status finalizeStatus, ft."blockNumber" finalizeBlockNumber from "DepositTxs" dt left join "FinalizeTxs" ft on dt."logHash" = ft."logHash" left join "IndexedBlocks" ib0 on dt."srcChainId" = ib0."chainId" left join "IndexedBlocks" ib1 on ft."dstChainId" = ib1."chainId" where dt."from" = ? limit ? offset ?`,
 				values: [account.toLocaleLowerCase(), pageSize, page * pageSize],
 			},
 			{ type: QueryTypes.SELECT }
 		)
-		return txs[0]
+		return txs
 	}
 }
