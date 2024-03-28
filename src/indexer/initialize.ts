@@ -3,6 +3,7 @@ import { DepositTxs } from '../db/model/depositTxs'
 import { sleep } from '../utils'
 import { sequelize } from '../db'
 import logger from '../utils/logger'
+import { FinalizeTxs } from '../db/model/finalizeTxs'
 
 export async function initialize(chainId: string) {
 	while (true) {
@@ -61,8 +62,15 @@ export async function initialize(chainId: string) {
 							const initialized = await dstContext.deliver.finalizedTxs(tx.logHash)
 							if (initialized) {
 								logger.info('tx already initialized:', tx)
-								await DepositTxs.update({ status: 'initialized' }, { where: { logHash: tx.logHash } })
-								break
+								const finalize = await FinalizeTxs.findOne({ where: { logHash: tx.logHash } })
+								if (finalize) {
+									if (finalize.status == 'finalized') {
+										await DepositTxs.update({ status: 'finalized' }, { where: { logHash: tx.logHash } })
+									} else {
+										await DepositTxs.update({ status: 'initialized' }, { where: { logHash: tx.logHash } })
+									}
+									break
+								}
 							}
 							const gas = await dstContext.deliver.finalize.estimateGas(txBody)
 							const feeData = await dstContext.provider.getFeeData()
