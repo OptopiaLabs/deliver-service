@@ -43,10 +43,6 @@ export async function initialize(chainId: string) {
 					while (true) {
 						try {
 							const poolBalance = await dstContext.provider.getBalance(dstContext.deliver.target)
-							console.log('poolBalance', poolBalance, dstContext.deliver.target, typeof poolBalance)
-							console.log('tx.amount', BigInt(tx.amount), typeof BigInt(tx.amount))
-							console.log('tx.amount', BigInt(tx.amount), typeof BigInt(tx.amount))
-
 							if (poolBalance <= BigInt(tx.amount)) {
 								await DepositTxs.update({ status: 'insufficient-funds' }, { where: { logHash: tx.logHash } })
 								break
@@ -61,8 +57,8 @@ export async function initialize(chainId: string) {
 							}
 							const initialized = await dstContext.deliver.finalizedTxs(tx.logHash)
 							if (initialized) {
-								logger.info('tx already initialized:', tx)
-								await DepositTxs.update({ status: 'initialized' }, { where: { logHash: tx.logHash } })
+								logger.info('tx already finalized:', tx)
+								await DepositTxs.update({ status: 'finalized' }, { where: { logHash: tx.logHash } })
 								break
 							}
 
