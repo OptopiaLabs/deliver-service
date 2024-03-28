@@ -5,9 +5,9 @@ const router = new Router()
 
 router.get('/txs/:account', async (ctx) => {
 	const { account } = ctx.params
-	let { page, pageSize } = ctx.request.query
+	let { chainId, page, pageSize } = ctx.request.query
 	// TODO validate params
-	const txs = await Tx.get(account.toLocaleLowerCase(), Number(page || 0), Number(pageSize || 10))
+	const txs = await Tx.get(chainId as string, account.toLocaleLowerCase(), Number(page || 0), Number(pageSize || 10))
 	ctx.body = txs
 })
 
