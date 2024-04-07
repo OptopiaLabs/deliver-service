@@ -63,6 +63,11 @@ export async function initialize(chainId: string) {
 								break
 							}
 
+							if (tx.timeoutAt <= dstContext.lastestBlock.timestamp) {
+								await DepositTxs.update({ status: 'timeout' }, { where: { logHash: tx.logHash } })
+								break
+							}
+
 							const txBody = {
 								srcChainId: tx.srcChainId,
 								logHash: tx.logHash,
