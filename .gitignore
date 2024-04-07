@@ -59,7 +59,7 @@ node_modules
 # dotenv environment variables file
 .env
 config.json
-config.yml
+config.yaml
 # idea
 .idea
 
