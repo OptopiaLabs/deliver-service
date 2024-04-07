@@ -25,7 +25,7 @@ services:
     ports:
       - $API_PORT:$API_PORT
     volumes:
-      - ./config.yml:$WORKDIR/config.yml:ro
+      - ./config.yaml:$WORKDIR/config.yaml:ro
       - ./logs:$WORKDIR/logs/:rw
   postgresdb:
     image: postgres:14-alpine

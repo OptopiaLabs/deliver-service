@@ -46,7 +46,7 @@ export interface Context {
 }
 
 export async function initContext() {
-	const configPath = process.env.CONFIGPATH ?? join(__dirname, '../../config.yml')
+	const configPath = process.env.CONFIGPATH ?? join(__dirname, '../../config.yaml')
 	if (!existsSync(configPath)) {
 		throw 'nonexistent config'
 	}
