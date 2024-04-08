@@ -27,6 +27,24 @@ interface Tx {
 
 export default class Txs {
 
+	public static async getAll(chainId: string, fromBlock: number, toBlock: number) {
+		const txs = await sequelize.query<Tx>(
+			{
+				query: `select dt."blockTimestamp" as depositTimestamp, ib0."indexedBlock" as srcIndexedBlock, ib1."indexedBlock" as dstIndexedBlock, dt."logHash", dt."txHash" srcTxHash, dt."logIndex" srcLogIndex, dt."srcChainId", dt."dstChainId", dt."from", dt."to", dt.amount as depositAmount, dt.fee depositFee, dt."timeoutAt" , dt.status depositStatus, dt."blockNumber" depositBlockNumber, ft."txHash" finalizeTxHash, ft."logIndex" finalizeLogIndex, ft.relayer, ft.amount finalizeAmount, ft.fee finalizeFee, ft.status finalizeStatus, ft."blockNumber" finalizeBlockNumber from "DepositTxs" dt left join "FinalizeTxs" ft on dt."logHash" = ft."logHash" left join "IndexedBlocks" ib0 on dt."srcChainId" = ib0."chainId" left join "IndexedBlocks" ib1 on ft."dstChainId" = ib1."chainId" where ft."dstChainId" = ? and (ft."blockNumber" >= ? and ft."blockNumber" < ?) order by ft."blockNumber" asc`,
+				values: [chainId, fromBlock, toBlock],
+			},
+			{ type: QueryTypes.SELECT }
+		)
+		const total = await sequelize.query<{ total: number }>(
+			{
+				query: `select count(*) as total from "DepositTxs" dt left join "FinalizeTxs" ft on dt."logHash" = ft."logHash" left join "IndexedBlocks" ib0 on dt."srcChainId" = ib0."chainId" left join "IndexedBlocks" ib1 on ft."dstChainId" = ib1."chainId" where ft."dstChainId" = ? and (ft."blockNumber" >= ? and ft."blockNumber" < ?)`,
+				values: [chainId, fromBlock, toBlock],
+			},
+			{ type: QueryTypes.SELECT }
+		)
+		return { txs, total: total[0].total }
+	}
+
 	public static async get(chainId: string, account: string, page: number, pageSize: number) {
 		const txs = await sequelize.query<Tx>(
 			{
