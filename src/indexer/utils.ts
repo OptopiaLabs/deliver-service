@@ -15,3 +15,7 @@ export async function waitIndex(chainId: string, context: Context, ms = 1000) {
 	}
 
 }
+
+export function isSupportedChain(chainId: string, context: Context) {
+	return !!context.allConfigs.get(chainId)
+}

@@ -10,6 +10,7 @@ import { sleep } from '../../utils'
 import logger from '../../utils/logger'
 import { createLoopRunner } from '../../worker/runner'
 import { Transaction } from 'sequelize'
+import { isSupportedChain } from '../utils'
 
 createLoopRunner(index)
 export async function index(chain: { chainId: string, context: Context }) {
@@ -79,7 +80,7 @@ async function processDepositLog(context: Context, deliver: ETHDeliver, log: Log
 	const block = await log.getBlock()
 	const blockTimestamp = block.timestamp
 	const logHash = solidityPackedKeccak256(['bytes32', 'uint256'], [txHash, logIndex])
-	const isSupported = context.isSupported(srcChainId) && context.isSupported(dstChainId)
+	const isSupported = isSupportedChain(srcChainId, context) && isSupportedChain(dstChainId, context)
 	const depositTx = {
 		logHash,
 		txHash,
@@ -167,3 +168,4 @@ async function processDepositorWithdrawnLog(chainId: string, deliver: ETHDeliver
 		await Withdrawals.create(depositorWithdrawal, { transaction })
 	}
 }
+
