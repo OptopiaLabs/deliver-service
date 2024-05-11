@@ -7,4 +7,10 @@ export class IndexedBlocks extends Model {
 
 	@Column({ type: DataType.BIGINT })
 	declare indexedBlock: number
+
+	@Column({ type: DataType.BIGINT })
+	declare latestBlock: number
+
+	@Column({ type: DataType.BIGINT })
+	declare latestBlockTimestamp: number
 }

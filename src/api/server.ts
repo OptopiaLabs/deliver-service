@@ -3,13 +3,22 @@ import cors = require('@koa/cors')
 
 import { koaBody } from 'koa-body'
 import { Server } from 'http'
-import { requestMiddleware } from './middleware'
+import { requestMiddleware, createContextMiddleware } from './middleware'
+import { createSimpleRunner } from '../worker/runner'
 import routers from './routers'
+import { Context } from '../config'
+import { openDB } from '../db'
+
+createSimpleRunner({
+	start: startServer,
+	stop: stopServer
+})
 
 const app = new Application()
 let server: Server
 
-export function startServer() {
+export async function startServer(context: Context) {
+	await openDB()
 	app.use(cors({
 		origin: process.env.CORS || "*"
 	}))
@@ -19,6 +28,8 @@ export function startServer() {
 		app.use(router.allowedMethods())
 		app.use(router.routes())
 	}
+
+	app.use(createContextMiddleware(context))
 
 	app.use(requestMiddleware)
 	app.middleware.unshift(requestMiddleware)

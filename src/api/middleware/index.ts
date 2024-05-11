@@ -1,6 +1,14 @@
 import * as Koa from 'koa';
 import logger from '../../utils/logger'
-import Errors from '../errors/errors';
+import Errors from '../errors/errors'
+import { Context } from '../../config';
+
+export function createContextMiddleware(context: Context) {
+	return async (ctx: Koa.ParameterizedContext<any, {}>, next: () => Promise<any>) => {
+		(ctx.body as any).context = context
+		await next()
+	}
+}
 
 export const requestMiddleware = async (ctx: Koa.ParameterizedContext<any, {}>, next: () => Promise<any>) => {
 	try {

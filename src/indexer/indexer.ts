@@ -1,20 +1,27 @@
-import { allChains } from '../config'
-import { index } from './index'
-import { initialize } from './initialize'
-import { finalize } from './finalize'
-import { confirm } from './confirm'
-import { pollBlock } from './pollBlock'
-import { timeout } from './timeout'
-import { indexWithdrawals } from './withdrawal'
+import { Context } from '../config'
+import { globSync } from 'glob'
+import { join } from 'path'
+import Job from '../worker/job'
 
-export function startIndexer() {
-	for (const chainId of allChains) {
-		pollBlock(chainId)
-		index(chainId)
-		confirm(chainId)
-		initialize(chainId)
-		timeout(chainId)
-		indexWithdrawals(chainId)
-		finalize(chainId)
+const files = [join(__dirname, './runners/**.ts'), join(__dirname, './runners/**.js')]
+const runners = globSync(files)
+
+const jobs: Job[] = []
+
+export function startIndexer(context: Context) {
+	const allChains = context.allChains
+	console.log('allChains', allChains)
+	allChains.forEach((chainId) => {
+		runners.forEach((runner) => {
+			const job = new Job(runner, { workerData: { chainId, context } })
+			job.start()
+			jobs.push(job)
+		})
+	})
+}
+
+export function stopIndexer() {
+	for (const job of jobs) {
+		job.stop()
 	}
 }
