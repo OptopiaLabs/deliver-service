@@ -104,7 +104,8 @@ export default class Deposits {
 		}
 
 		const dstProvider = new JsonRpcProvider(dstConfig.rpc)
-		const dstDeliver = ETHDeliver__factory.connect(dstConfig.deliver, dstProvider)
+		const dstRelayer = Wallet.fromPhrase(dstConfig.relayer, dstProvider)
+		const dstDeliver = ETHDeliver__factory.connect(dstConfig.deliver, dstRelayer)
 		const gas = await dstDeliver.finalize.estimateGas(txBody)
 		const feeData = await dstProvider.getFeeData()
 		const gasLimit = gas * BigInt(dstConfig.finalizeTxGasLimitCap) / 100n

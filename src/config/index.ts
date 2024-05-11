@@ -54,7 +54,7 @@ export async function initContext() {
 	const values = Object.values(cfgs)
 	const allContext: Context = new Context()
 	for (let i = 0; i < values.length; i++) {
-		const chainId = chainIds[i]
+		const chainId = chainIds[i].toString()
 		const value = values[i]
 		try {
 			const rpc = value.rpc

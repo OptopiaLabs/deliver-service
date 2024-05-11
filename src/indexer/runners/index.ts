@@ -9,28 +9,28 @@ import { sequelize } from '../../db'
 import { sleep } from '../../utils'
 import logger from '../../utils/logger'
 import { createLoopRunner } from '../../worker/runner'
+import { Transaction } from 'sequelize'
 
 createLoopRunner(index)
-
 export async function index(chain: { chainId: string, context: Context }) {
 	const { chainId, context } = chain
 	const config = context.allConfigs.get(chainId)
 	const indexed = await IndexedBlocks.findOne({ where: { chainId } })
-	let fromBlock = Number(indexed.indexedBlock)
+	const fromBlock = Number(indexed.indexedBlock)
 	const maxPollBlocks = Number(config.maxPollBlocks)
 	const maxToBlock = fromBlock + maxPollBlocks
-	const toBlock = maxToBlock <= indexed.latestBlock ? maxToBlock : indexed.latestBlock
+	const toBlock = Number(maxToBlock <= indexed.latestBlock ? maxToBlock : indexed.latestBlock)
 	console.log('chainId:', chainId, 'index fromBlock:', fromBlock, 'toBlock:', toBlock, 'latestBlock:', indexed.latestBlock)
 	const provider = new JsonRpcProvider(config.rpc)
 	const deliver = ETHDeliver__factory.connect(config.deliver, provider)
 	if (toBlock > fromBlock) {
 		const transaction = await sequelize.transaction()
 		try {
-			await processEvents(chainId, context, deliver, provider, fromBlock, toBlock)
-			await IndexedBlocks.upsert({ chainId, indexedBlock: toBlock })
-			fromBlock = toBlock
+			await processEvents(chainId, context, deliver, provider, fromBlock, toBlock, transaction)
+			await IndexedBlocks.update({ indexedBlock: toBlock }, { where: { chainId }, transaction })
 			await transaction.commit()
 		} catch (e) {
+			console.log(`index failed ${chainId}`, e)
 			await transaction.rollback()
 		}
 	}
@@ -40,7 +40,7 @@ export async function index(chain: { chainId: string, context: Context }) {
 
 }
 
-async function processEvents(chainId: string, context: Context, deliver: ETHDeliver, provider: Provider, fromBlock: number, toBlock: number) {
+async function processEvents(chainId: string, context: Context, deliver: ETHDeliver, provider: Provider, fromBlock: number, toBlock: number, transaction: Transaction) {
 	const depositTopicHash = deliver.filters['Deposit'].fragment.topicHash
 	const finalizeTopicHash = deliver.filters['Finalize'].fragment.topicHash
 	const depositorWithdrawTopicHash = deliver.filters['DepositorWithdrawn'].fragment.topicHash
@@ -52,18 +52,18 @@ async function processEvents(chainId: string, context: Context, deliver: ETHDeli
 	})
 	for (const log of logs) {
 		if (log.topics[0] == depositTopicHash) {
-			await processDepositLog(context, deliver, log)
+			await processDepositLog(context, deliver, log, transaction)
 		} else if (log.topics[0] == finalizeTopicHash) {
-			await processFinalizeLog(deliver, log)
+			await processFinalizeLog(deliver, log, transaction)
 		} else if (log.topics[0] == depositorWithdrawTopicHash) {
-			await processDepositorWithdrawnLog(chainId, deliver, log)
+			await processDepositorWithdrawnLog(chainId, deliver, log, transaction)
 		} else {
 			logger.info('index unknown event log:', log)
 		}
 	}
 }
 
-async function processDepositLog(context: Context, deliver: ETHDeliver, log: Log) {
+async function processDepositLog(context: Context, deliver: ETHDeliver, log: Log, transaction: Transaction) {
 	// event Deposit(uint256 srcChainId, uint256 dstChainId, address from, address to, uint256 amount, uint256 fee);
 	const meta = deliver.interface.decodeEventLog('Deposit', log.data, log.topics)
 	const txHash = log.transactionHash.toLocaleLowerCase()
@@ -95,13 +95,13 @@ async function processDepositLog(context: Context, deliver: ETHDeliver, log: Log
 		blockTimestamp,
 		status: isSupported ? 'indexed' : 'unsupported-chain'
 	}
-	const exists = await DepositTxs.findOne({ where: { logHash } })
+	const exists = await DepositTxs.findOne({ where: { logHash }, transaction })
 	if (!exists) {
-		await DepositTxs.create(depositTx)
+		await DepositTxs.create(depositTx, { transaction })
 	}
 }
 
-async function processFinalizeLog(deliver: ETHDeliver, log: Log) {
+async function processFinalizeLog(deliver: ETHDeliver, log: Log, transaction: Transaction) {
 	// event Finalize(address relayer, uint256 srcChainId, uint256 dstChainId, bytes32 logHash, address to, uint256 amount, uint256 fee);
 	const meta = deliver.interface.decodeEventLog('Finalize', log.data, log.topics)
 	const txHash = log.transactionHash
@@ -130,13 +130,13 @@ async function processFinalizeLog(deliver: ETHDeliver, log: Log) {
 		blockTimestamp,
 		status: 'indexed'
 	}
-	const exists = await FinalizeTxs.findOne({ where: { logHash } })
+	const exists = await FinalizeTxs.findOne({ where: { logHash }, transaction })
 	if (!exists) {
-		await FinalizeTxs.create(finalizeTx)
+		await FinalizeTxs.create(finalizeTx, { transaction })
 	}
 }
 
-async function processDepositorWithdrawnLog(chainId: string, deliver: ETHDeliver, log: Log) {
+async function processDepositorWithdrawnLog(chainId: string, deliver: ETHDeliver, log: Log, transaction: Transaction) {
 	// event Finalize(address relayer, uint256 srcChainId, uint256 dstChainId, bytes32 logHash, address to, uint256 amount, uint256 fee);
 	const meta = deliver.interface.decodeEventLog('DepositorWithdrawn', log.data, log.topics)
 	const txHash = log.transactionHash
@@ -162,8 +162,8 @@ async function processDepositorWithdrawnLog(chainId: string, deliver: ETHDeliver
 		blockNumber,
 		status: 'indexed'
 	}
-	const exists = await Withdrawals.findOne({ where: { logHash } })
+	const exists = await Withdrawals.findOne({ where: { logHash }, transaction })
 	if (!exists) {
-		await Withdrawals.create(depositorWithdrawal)
+		await Withdrawals.create(depositorWithdrawal, { transaction })
 	}
 }

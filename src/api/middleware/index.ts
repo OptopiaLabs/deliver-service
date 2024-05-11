@@ -5,7 +5,7 @@ import { Context } from '../../config';
 
 export function createContextMiddleware(context: Context) {
 	return async (ctx: Koa.ParameterizedContext<any, {}>, next: () => Promise<any>) => {
-		(ctx.body as any).context = context
+		ctx.request.body.context = context
 		await next()
 	}
 }

@@ -24,12 +24,13 @@ export async function startServer(context: Context) {
 	}))
 		.use(koaBody())
 
+	app.use(createContextMiddleware(context))
+
 	for (const router of routers) {
 		app.use(router.allowedMethods())
 		app.use(router.routes())
 	}
 
-	app.use(createContextMiddleware(context))
 
 	app.use(requestMiddleware)
 	app.middleware.unshift(requestMiddleware)
