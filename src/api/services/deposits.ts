@@ -1,21 +1,23 @@
-import { recoverAddress, TypedDataEncoder, ZeroAddress, ZeroHash } from 'ethers'
-import { getContext } from '../../config'
+import { JsonRpcProvider, recoverAddress, TypedDataEncoder, Wallet, ZeroAddress, ZeroHash } from 'ethers'
+import { Context } from '../../config'
 import { DepositTxs } from '../../db/model/depositTxs'
 import { Withdrawals } from '../../db/model/withdrawals'
 import Errors from '../errors/errors'
+import { ETHDeliver__factory } from '@simpledeliver/deliver-contracts'
 
 type AdminSig = string
 
 export default class Deposits {
 
 	public static async apply(
+		context: Context,
 		chainId: string,
 		logHash: string,
 		depositor: string,
 		amount: string,
 		depositorSig: string
 	): Promise<AdminSig> {
-		const context = getContext(chainId)
+		const config = context.allConfigs.get(chainId)
 		if (!context) {
 			throw Errors.BAD_REQUEST.with(`${chainId} is not supported`)
 		}
@@ -23,7 +25,9 @@ export default class Deposits {
 		if (r) {
 			throw Errors.BAD_REQUEST.with(`${logHash} is already ${r.status}`)
 		}
-		const exists = await context.deliver.depositorWithdrawals(logHash)
+		const provider = new JsonRpcProvider(config.rpc)
+		const deliver = ETHDeliver__factory.connect(config.deliver, provider)
+		const exists = await deliver.depositorWithdrawals(logHash)
 		if (exists) {
 			throw Errors.BAD_REQUEST.with(`withdrawl already sent, wait to indexed`)
 		}
@@ -41,7 +45,7 @@ export default class Deposits {
 			name: 'ETHDELIVER',
 			version: 'v1',
 			chainId,
-			verifyingContract: context.deliver.target as string
+			verifyingContract: deliver.target as string
 		}
 		const types = {
 			DepositorWithdrawal: [
@@ -65,25 +69,29 @@ export default class Deposits {
 		if (from.toLocaleLowerCase() !== depositor.toLocaleLowerCase() || from.toLocaleLowerCase() != tx.from.toLocaleLowerCase()) {
 			throw Errors.FORBIDDEN.with('signer is not the depositor')
 		}
-		const adminSig = await context.guardian.signTypedData(domain, types, payload)
+		const guardian = Wallet.fromPhrase(config.guardian)
+		const adminSig = await guardian.signTypedData(domain, types, payload)
 		return adminSig
 	}
 
 	public static async estimateDeposit(
+		context: Context,
 		srcChainId: string,
 		dstChainId: string,
 		amount: string
 	) {
-		const srcContext = getContext(srcChainId)
-		if (!srcContext) {
+		const srcConfig = context.allConfigs.get(srcChainId)
+		if (!srcConfig) {
 			throw Errors.BAD_REQUEST.with(`${srcChainId} is not supported`)
 		}
-		const dstContext = getContext(dstChainId)
-		if (!dstContext) {
+		const dstConfig = context.allConfigs.get(dstChainId)
+		if (!dstConfig) {
 			throw Errors.BAD_REQUEST.with(`${dstChainId} is not supported`)
 		}
 		const received = BigInt(amount)
-		const depositFee = await srcContext.deliver.depositFee(received)
+		const srcProvider = new JsonRpcProvider(srcConfig.rpc)
+		const srcDeliver = ETHDeliver__factory.connect(srcConfig.deliver, srcProvider)
+		const depositFee = await srcDeliver.depositFee(received)
 		if (received <= depositFee) {
 			throw Errors.BAD_REQUEST.with(`received ${received} is less than depositFee ${depositFee}`)
 		}
@@ -94,16 +102,19 @@ export default class Deposits {
 			amount: received - depositFee,
 			timeoutAt: Math.floor(Date.now() / 1000) + 86400
 		}
-		const gas = await dstContext.deliver.finalize.estimateGas(txBody)
-		const feeData = await dstContext.provider.getFeeData()
-		const gasLimit = gas * BigInt(dstContext.finalizeTxGasLimitCap) / 100n
-		const gasPrice = feeData.gasPrice! * BigInt(dstContext.finalizeTxGasPriceCap) / 100n
+
+		const dstProvider = new JsonRpcProvider(dstConfig.rpc)
+		const dstDeliver = ETHDeliver__factory.connect(dstConfig.deliver, dstProvider)
+		const gas = await dstDeliver.finalize.estimateGas(txBody)
+		const feeData = await dstProvider.getFeeData()
+		const gasLimit = gas * BigInt(dstConfig.finalizeTxGasLimitCap) / 100n
+		const gasPrice = feeData.gasPrice! * BigInt(dstConfig.finalizeTxGasPriceCap) / 100n
 		const estimateFinalizeTxFee = gasLimit * gasPrice
 		if (received - depositFee <= estimateFinalizeTxFee) {
 			throw Errors.BAD_REQUEST.with(`estimate finalized ${received - depositFee} is less than estimateFinalizeTxFee ${estimateFinalizeTxFee}`)
 		}
 		const estimateAmt = received - depositFee - estimateFinalizeTxFee
-		const dstPoolBalance = await dstContext.provider.getBalance(dstContext.deliver.target)
+		const dstPoolBalance = await dstProvider.getBalance(dstDeliver.target)
 		if (estimateAmt > dstPoolBalance) {
 			throw Errors.BAD_REQUEST.with(`estimateAmt ${estimateAmt} is greater than dst pool balance ${dstPoolBalance}`)
 		}

@@ -1,6 +1,6 @@
 
 import { ETHDeliver, ETHDeliver__factory } from '@simpledeliver/deliver-contracts'
-import { Block, JsonRpcProvider, Provider, Signer, Wallet } from 'ethers'
+import { JsonRpcProvider, Provider, Signer, Wallet } from 'ethers'
 import { join } from 'path'
 import { readFileSync, existsSync } from 'fs'
 import { assert } from 'console'
@@ -8,10 +8,7 @@ import { IndexedBlocks } from '../db/model/indexedBlocks'
 import { load } from 'js-yaml'
 import logger from '../utils/logger'
 
-const AllContext: [string: Context] = Object.create({})
-export let allChains: string[] = []
-
-type RelayerConfig = {
+interface Config {
 	relayer: string
 	guardian: string
 	rpc: string
@@ -25,24 +22,24 @@ type RelayerConfig = {
 	finalizeTxGasPriceCap: number
 }
 
-export interface Context {
-	signer: Signer // relayer
-	guardian: Signer
-	provider: Provider
-	chainId: string
-	deliver: ETHDeliver
-	maxPCT: bigint
-	depositBaseFee: bigint
-	depositFeeRate: bigint
-	finalizeTxGas: bigint
-	depositSafeBlockInterval: number
-	finalizeSafeBlockInterval: number
-	lastestBlock: Block
-	maxPollBlocks: number
-	latestBlockPollTimeInterval: number
-	finalizeTxGasLimitCap: number
-	finalizeTxGasPriceCap: number
-	stop: boolean
+export class Context {
+	allConfigs = new Map<string, Config>()
+
+	public addChain(chain: string, config: Config) {
+		this.allConfigs.set(chain, config)
+	}
+
+	getConfig(chain: string) {
+		return this.allConfigs.get(chain)
+	}
+
+	get allChains() {
+		return Array.from(this.allConfigs.keys())
+	}
+
+	public isSupported(chain: string) {
+		return !!this.allConfigs.get(chain)
+	}
 }
 
 export async function initContext() {
@@ -52,9 +49,10 @@ export async function initContext() {
 	}
 	const configFile = readFileSync(configPath, 'utf8')
 	const data: any = load(configFile)
-	const cfgs: [string: RelayerConfig] = data
+	const cfgs: [string: Config] = data
 	const chainIds = Object.keys(cfgs)
 	const values = Object.values(cfgs)
+	const allContext: Context = new Context()
 	for (let i = 0; i < values.length; i++) {
 		const chainId = chainIds[i]
 		const value = values[i]
@@ -73,52 +71,17 @@ export async function initContext() {
 			const deliver = ETHDeliver__factory.connect(value.deliver, signer)
 			const g = await deliver.guardian()
 			assert(g.toLocaleLowerCase() == guardian.address.toLocaleLowerCase(), 'guardian required to sign depositor withdrawal')
-			const config = await deliver.config()
-			const maxPCT = await deliver.MAXPCT();
-			const lastestBlock = await provider.getBlock('latest')
+			const latestBlock = await provider.getBlock('latest')
 			const indexed = await IndexedBlocks.findOne({ where: { chainId } })
 			if (!indexed?.dataValues) {
-				await IndexedBlocks.upsert({ chainId, indexedBlock: value.startBlock })
+				await IndexedBlocks.upsert({ chainId, indexedBlock: value.startBlock, latestBlock: latestBlock.number, latestBlockTimestamp: latestBlock.timestamp })
 			}
-			const context: Context = {
-				deliver,
-				signer,
-				guardian,
-				provider,
-				chainId,
-				maxPCT,
-				lastestBlock,
-				depositSafeBlockInterval: value.depositSafeBlockInterval,
-				finalizeSafeBlockInterval: value.finalizeSafeBlockInterval,
-				maxPollBlocks: value.maxPollBlocks,
-				latestBlockPollTimeInterval: value.latestBlockPollTimeInterval,
-				finalizeTxGasLimitCap: value.finalizeTxGasLimitCap,
-				finalizeTxGasPriceCap: value.finalizeTxGasPriceCap,
-				stop: false,
-				...config
-			}
-			Object.defineProperty(AllContext, chainId, { value: context, writable: true, configurable: true, enumerable: true })
-			allChains = Object.keys(AllContext)
+			allContext.addChain(chainId, value)
 		} catch (e) {
 			logger.error('context init failed:', chainId, value)
 			throw e
 		}
 	}
-}
 
-export function getContext(chainId: string): Context | null {
-	const key = chainId as keyof typeof AllContext;
-	return AllContext[key] as Context
-}
-
-export function setContext(chainId: string, context: Context) {
-	Object.defineProperty(AllContext, chainId, { value: context, writable: true, configurable: true, enumerable: true })
-}
-
-export function stopAll() {
-	for (const chainId of allChains) {
-		const context = getContext(chainId)
-		context.stop = true
-		setContext(chainId, context)
-	}
+	return allContext
 }

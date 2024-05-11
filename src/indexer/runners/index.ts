@@ -1,76 +1,71 @@
-import { Log, solidityPackedKeccak256 } from 'ethers'
-import { Context, getContext, setContext } from '../config'
-import { DepositTxs } from '../db/model/depositTxs'
-import { FinalizeTxs } from '../db/model/finalizeTxs'
-import { Withdrawals } from '../db/model/withdrawals'
-import { IndexedBlocks } from '../db/model/indexedBlocks'
-import { sequelize } from '../db'
-import { sleep } from '../utils'
-import logger from '../utils/logger'
+import { ETHDeliver, ETHDeliver__factory } from '@simpledeliver/deliver-contracts'
+import { JsonRpcProvider, Log, Provider, solidityPackedKeccak256 } from 'ethers'
+import { Context } from '../../config'
+import { DepositTxs } from '../../db/model/depositTxs'
+import { FinalizeTxs } from '../../db/model/finalizeTxs'
+import { Withdrawals } from '../../db/model/withdrawals'
+import { IndexedBlocks } from '../../db/model/indexedBlocks'
+import { sequelize } from '../../db'
+import { sleep } from '../../utils'
+import logger from '../../utils/logger'
+import { createLoopRunner } from '../../worker/runner'
 
-export async function index(chainId: string) {
+createLoopRunner(index)
+
+export async function index(chain: { chainId: string, context: Context }) {
+	const { chainId, context } = chain
+	const config = context.allConfigs.get(chainId)
 	const indexed = await IndexedBlocks.findOne({ where: { chainId } })
 	let fromBlock = Number(indexed.indexedBlock)
-	while (true) {
+	const maxPollBlocks = Number(config.maxPollBlocks)
+	const maxToBlock = fromBlock + maxPollBlocks
+	const toBlock = maxToBlock <= indexed.latestBlock ? maxToBlock : indexed.latestBlock
+	console.log('chainId:', chainId, 'index fromBlock:', fromBlock, 'toBlock:', toBlock, 'latestBlock:', indexed.latestBlock)
+	const provider = new JsonRpcProvider(config.rpc)
+	const deliver = ETHDeliver__factory.connect(config.deliver, provider)
+	if (toBlock > fromBlock) {
+		const transaction = await sequelize.transaction()
 		try {
-			const context = getContext(chainId)
-			if (context.stop) {
-				console.log(`index stopped:${chainId}`)
-				break
-			}
-			const maxPollBlocks = Number(context.maxPollBlocks)
-			const maxToBlock = fromBlock + maxPollBlocks
-			const toBlock = maxToBlock <= context.lastestBlock.number ? maxToBlock : context.lastestBlock.number
-			console.log('chainId:', chainId, 'index fromBlock:', fromBlock, 'toBlock:', toBlock)
-			if (toBlock > fromBlock) {
-				setContext(chainId, context)
-				const transaction = await sequelize.transaction()
-				try {
-					await processEvents(context, fromBlock, toBlock)
-					await IndexedBlocks.upsert({ chainId: context.chainId, indexedBlock: toBlock })
-					fromBlock = toBlock
-					await transaction.commit()
-				} catch (e) {
-					await transaction.rollback()
-				}
-			}
-			if (toBlock - fromBlock != maxPollBlocks) {
-				await sleep(context.latestBlockPollTimeInterval)
-			}
+			await processEvents(chainId, context, deliver, provider, fromBlock, toBlock)
+			await IndexedBlocks.upsert({ chainId, indexedBlock: toBlock })
+			fromBlock = toBlock
+			await transaction.commit()
 		} catch (e) {
-			if (getContext(chainId).stop) { break }
-			logger.error('index failed:', e)
-			await sleep(500)
+			await transaction.rollback()
 		}
 	}
+	if (toBlock - fromBlock != maxPollBlocks) {
+		await sleep(config.latestBlockPollTimeInterval)
+	}
+
 }
 
-async function processEvents(context: Context, fromBlock: number, toBlock: number) {
-	const depositTopicHash = context.deliver.filters['Deposit'].fragment.topicHash
-	const finalizeTopicHash = context.deliver.filters['Finalize'].fragment.topicHash
-	const depositorWithdrawTopicHash = context.deliver.filters['DepositorWithdrawn'].fragment.topicHash
-	const logs = await context.provider.getLogs({
-		address: context.deliver.target,
+async function processEvents(chainId: string, context: Context, deliver: ETHDeliver, provider: Provider, fromBlock: number, toBlock: number) {
+	const depositTopicHash = deliver.filters['Deposit'].fragment.topicHash
+	const finalizeTopicHash = deliver.filters['Finalize'].fragment.topicHash
+	const depositorWithdrawTopicHash = deliver.filters['DepositorWithdrawn'].fragment.topicHash
+	const logs = await provider.getLogs({
+		address: deliver.target,
 		fromBlock,
 		toBlock,
 		topics: [[depositTopicHash, finalizeTopicHash, depositorWithdrawTopicHash]]
 	})
 	for (const log of logs) {
 		if (log.topics[0] == depositTopicHash) {
-			await processDepositLog(context, log)
+			await processDepositLog(context, deliver, log)
 		} else if (log.topics[0] == finalizeTopicHash) {
-			await processFinalizeLog(context, log)
+			await processFinalizeLog(deliver, log)
 		} else if (log.topics[0] == depositorWithdrawTopicHash) {
-			await processDepositorWithdrawnLog(context, log)
+			await processDepositorWithdrawnLog(chainId, deliver, log)
 		} else {
 			logger.info('index unknown event log:', log)
 		}
 	}
 }
 
-async function processDepositLog(context: Context, log: Log) {
+async function processDepositLog(context: Context, deliver: ETHDeliver, log: Log) {
 	// event Deposit(uint256 srcChainId, uint256 dstChainId, address from, address to, uint256 amount, uint256 fee);
-	const meta = context.deliver.interface.decodeEventLog('Deposit', log.data, log.topics)
+	const meta = deliver.interface.decodeEventLog('Deposit', log.data, log.topics)
 	const txHash = log.transactionHash.toLocaleLowerCase()
 	const logIndex = log.index
 	const srcChainId = meta[0]
@@ -84,7 +79,7 @@ async function processDepositLog(context: Context, log: Log) {
 	const block = await log.getBlock()
 	const blockTimestamp = block.timestamp
 	const logHash = solidityPackedKeccak256(['bytes32', 'uint256'], [txHash, logIndex])
-	const isSupported = !!getContext(srcChainId) && !!getContext(dstChainId)
+	const isSupported = context.isSupported(srcChainId) && context.isSupported(dstChainId)
 	const depositTx = {
 		logHash,
 		txHash,
@@ -106,9 +101,9 @@ async function processDepositLog(context: Context, log: Log) {
 	}
 }
 
-async function processFinalizeLog(context: Context, log: Log) {
+async function processFinalizeLog(deliver: ETHDeliver, log: Log) {
 	// event Finalize(address relayer, uint256 srcChainId, uint256 dstChainId, bytes32 logHash, address to, uint256 amount, uint256 fee);
-	const meta = context.deliver.interface.decodeEventLog('Finalize', log.data, log.topics)
+	const meta = deliver.interface.decodeEventLog('Finalize', log.data, log.topics)
 	const txHash = log.transactionHash
 	const logIndex = log.index
 	const relayer = meta[0].toLocaleLowerCase()
@@ -141,9 +136,9 @@ async function processFinalizeLog(context: Context, log: Log) {
 	}
 }
 
-async function processDepositorWithdrawnLog(context: Context, log: Log) {
+async function processDepositorWithdrawnLog(chainId: string, deliver: ETHDeliver, log: Log) {
 	// event Finalize(address relayer, uint256 srcChainId, uint256 dstChainId, bytes32 logHash, address to, uint256 amount, uint256 fee);
-	const meta = context.deliver.interface.decodeEventLog('DepositorWithdrawn', log.data, log.topics)
+	const meta = deliver.interface.decodeEventLog('DepositorWithdrawn', log.data, log.topics)
 	const txHash = log.transactionHash
 	const logIndex = log.index
 	const m = meta[0]
@@ -154,7 +149,6 @@ async function processDepositorWithdrawnLog(context: Context, log: Log) {
 	const depositorSig = m[4].toLocaleLowerCase()
 	const adminSig = m[5].toLocaleLowerCase()
 	const blockNumber = log.blockNumber
-	const chainId = context.chainId
 	const depositorWithdrawal = {
 		logHash,
 		txHash,
