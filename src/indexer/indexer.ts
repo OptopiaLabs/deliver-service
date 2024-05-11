@@ -10,7 +10,6 @@ const jobs: Job[] = []
 
 export function startIndexer(context: Context) {
 	const allChains = context.allChains
-	console.log('allChains', allChains)
 	allChains.forEach((chainId) => {
 		runners.forEach((runner) => {
 			const job = new Job(runner, { workerData: { chainId, context } })

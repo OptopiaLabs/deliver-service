@@ -69,8 +69,8 @@ async function processDepositLog(context: Context, deliver: ETHDeliver, log: Log
 	const meta = deliver.interface.decodeEventLog('Deposit', log.data, log.topics)
 	const txHash = log.transactionHash.toLocaleLowerCase()
 	const logIndex = log.index
-	const srcChainId = meta[0]
-	const dstChainId = meta[1]
+	const srcChainId = meta[0].toString()
+	const dstChainId = meta[1].toString()
 	const from = meta[2].toLocaleLowerCase()
 	const to = meta[3].toLocaleLowerCase()
 	const amount = BigInt(meta[4]).toString()
