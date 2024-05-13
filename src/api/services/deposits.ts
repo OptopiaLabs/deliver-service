@@ -106,6 +106,10 @@ export default class Deposits {
 		const dstProvider = new JsonRpcProvider(dstConfig.rpc)
 		const dstRelayer = Wallet.fromPhrase(dstConfig.relayer, dstProvider)
 		const dstDeliver = ETHDeliver__factory.connect(dstConfig.deliver, dstRelayer)
+		const dstPoolBalance = await dstProvider.getBalance(dstDeliver.target)
+		if (received >= dstPoolBalance) {
+			throw Errors.BAD_REQUEST.with(`dst received ${received} is greater than dst pool balance ${dstPoolBalance}`)
+		}
 		const gas = await dstDeliver.finalize.estimateGas(txBody)
 		const feeData = await dstProvider.getFeeData()
 		const gasLimit = gas * BigInt(dstConfig.finalizeTxGasLimitCap) / 100n
@@ -115,7 +119,6 @@ export default class Deposits {
 			throw Errors.BAD_REQUEST.with(`estimate finalized ${received - depositFee} is less than estimateFinalizeTxFee ${estimateFinalizeTxFee}`)
 		}
 		const estimateAmt = received - depositFee - estimateFinalizeTxFee
-		const dstPoolBalance = await dstProvider.getBalance(dstDeliver.target)
 		if (estimateAmt > dstPoolBalance) {
 			throw Errors.BAD_REQUEST.with(`estimateAmt ${estimateAmt} is greater than dst pool balance ${dstPoolBalance}`)
 		}
