@@ -7,6 +7,9 @@ import logger from '../../utils/logger'
 import { IndexedBlocks } from '../../db/model/indexedBlocks'
 import { JsonRpcProvider } from 'ethers'
 import { waitIndex } from '../utils'
+import { createLoopRunner } from '../../worker/runner'
+
+createLoopRunner(indexWithdrawals, 1000)
 
 export async function indexWithdrawals(chain: { chainId: string, context: Context }) {
 	const { chainId, context } = chain
@@ -33,14 +36,14 @@ export async function indexWithdrawals(chain: { chainId: string, context: Contex
 			continue
 		}
 		if (recepit.status == 1) {
-			const t = await sequelize.transaction()
+			const transaction = await sequelize.transaction()
 			try {
-				await Withdrawals.update({ status: 'finalized' }, { where: { logHash: tx.logHash } })
-				await DepositTxs.update({ status: 'withdrawn' }, { where: { logHash: tx.logHash } })
-				await t.commit()
+				await Withdrawals.update({ status: 'finalized' }, { where: { logHash: tx.logHash }, transaction })
+				await DepositTxs.update({ status: 'withdrawn' }, { where: { logHash: tx.logHash }, transaction })
+				await transaction.commit()
 				logger.info('withdrawl finalized:', tx)
 			} catch (e) {
-				await t.rollback()
+				await transaction.rollback()
 			}
 		}
 	}
