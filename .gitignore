@@ -69,4 +69,5 @@ config.dev.yaml
 dist
 logs
 db
+publish.sh
 !/src/db

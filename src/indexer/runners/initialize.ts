@@ -85,6 +85,11 @@ export async function initialize(chain: { chainId: string, context: Context }) {
 
 					const gas = await dstDeliver.finalize.estimateGas(txBody)
 					const feeData = await dstProvider.getFeeData()
+					const maxGasPrice = BigInt(1000e9)
+					if (feeData.gasPrice > maxGasPrice) {
+						await sleep(10000)
+						continue
+					}
 					const t = await sequelize.transaction();
 					try {
 						await DepositTxs.update({ status: 'initialized' }, { where: { logHash: tx.logHash } })
